@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- .NET 11 = C# 15. Если SDK 11 не установлен, временно: net10.0 + LangVersion 14 -->
+    <TargetFramework>net11.0</TargetFramework>
+    <LangVersion>15</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ComputerManager</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\Fonts\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.2.0" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.2.0" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.2.0" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.*" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.*" />
+    <PackageReference Include="System.DirectoryServices.Protocols" Version="11.0.0" />
+  </ItemGroup>
+
+  <!-- Папка Install (7-zip.msi, PsExec64.exe) копируется явно: и в bin, и в publish -->
+  <Target Name="CopyInstallFolder" AfterTargets="Build" Condition="Exists('$(MSBuildProjectDirectory)\Install')">
+    <ItemGroup>
+      <InstallFilesBuild Include="$(MSBuildProjectDirectory)\Install\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(InstallFilesBuild)"
+          DestinationFiles="@(InstallFilesBuild->'$(OutDir)Install\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyInstallFolderToPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <InstallFilesPublish Include="$(MSBuildProjectDirectory)\Install\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(InstallFilesPublish)"
+          DestinationFiles="@(InstallFilesPublish->'$(PublishDir)Install\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Warning Condition="!Exists('$(MSBuildProjectDirectory)\Install\7-zip\7-zip.msi')"
+             Text="Нет файла $(MSBuildProjectDirectory)\Install\7-zip\7-zip.msi - положите его туда, иначе он не попадёт в publish." />
+    <Warning Condition="!Exists('$(MSBuildProjectDirectory)\Install\PsExec64\PsExec64.exe')"
+             Text="Нет файла $(MSBuildProjectDirectory)\Install\PsExec64\PsExec64.exe - положите его туда, иначе он не попадёт в publish." />
+    <Message Importance="high" Text="Install скопирована в $(PublishDir)Install" />
+  </Target>
+
+</Project>

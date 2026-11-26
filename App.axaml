@@ -1,0 +1,106 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="ComputerManager.App">
+    <Application.Resources>
+        <ResourceDictionary>
+            <!-- JetBrains Mono, если лежит в Assets/Fonts; иначе системные моноширинные -->
+            <FontFamily x:Key="MonoFont">avares://ComputerManager/Assets/Fonts#JetBrains Mono, Cascadia Mono, Consolas, monospace</FontFamily>
+
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="OnlineBrush">#1B5E20</SolidColorBrush>
+                    <SolidColorBrush x:Key="OfflineBrush">#5C5439</SolidColorBrush>
+                    <SolidColorBrush x:Key="PanelBrush">#EFE2B8</SolidColorBrush>
+                    <SolidColorBrush x:Key="StatusBrush">#E6D6A3</SolidColorBrush>
+                    <SolidColorBrush x:Key="LineBrush">#CDBB86</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBgBrush">#DCC984</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonHoverBrush">#D2BD72</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonPressedBrush">#C6AE5C</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonFgBrush">#1B1810</SolidColorBrush>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="OnlineBrush">#66BB6A</SolidColorBrush>
+                    <SolidColorBrush x:Key="OfflineBrush">#9AA5BA</SolidColorBrush>
+                    <SolidColorBrush x:Key="PanelBrush">#171C28</SolidColorBrush>
+                    <SolidColorBrush x:Key="StatusBrush">#080B11</SolidColorBrush>
+                    <SolidColorBrush x:Key="LineBrush">#22304D</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBgBrush">#22304D</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonHoverBrush">#2C3F63</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonPressedBrush">#1B3366</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonFgBrush">#E4E9F2</SolidColorBrush>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+
+    <Application.Styles>
+        <FluentTheme>
+            <FluentTheme.Palettes>
+                <!-- Цвета взяты из скриншота Passenger (тема Passenger, dark) -->
+                <ColorPaletteResources x:Key="Dark"
+                                       Accent="#5B8DFF"
+                                       RegionColor="#0F131C"
+                                       BaseHigh="#E4E9F2"
+                                       BaseMediumHigh="#C5CCDA"
+                                       BaseMedium="#9AA5BA"
+                                       ChromeLow="#171C28"
+                                       ChromeMediumLow="#171C28"
+                                       ChromeMedium="#22304D"
+                                       ChromeHigh="#2C3F63"
+                                       ListLow="#171C28"
+                                       ListMedium="#1B3366" />
+                <ColorPaletteResources x:Key="Light"
+                                       Accent="#0B4FB3"
+                                       RegionColor="#F8F0D8"
+                                       BaseHigh="#1B1810"
+                                       BaseMediumHigh="#332D1C"
+                                       BaseMedium="#5C5439"
+                                       AltHigh="#FBF4DC"
+                                       AltMediumHigh="#CCFBF4DC"
+                                       AltMedium="#99FBF4DC"
+                                       AltMediumLow="#66FBF4DC"
+                                       AltLow="#33FBF4DC"
+                                       ChromeWhite="#FBF4DC"
+                                       ChromeLow="#EFE3BC"
+                                       ChromeMediumLow="#EADCAE"
+                                       ChromeMedium="#DECD97"
+                                       ChromeHigh="#C9B67C"
+                                       ListLow="#EFE3BC"
+                                       ListMedium="#E3D3A0" />
+            </FluentTheme.Palettes>
+        </FluentTheme>
+        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
+
+        <Style Selector="DataGridColumnHeader">
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+        </Style>
+        <Style Selector="DataGridCell">
+            <Setter Property="MinHeight" Value="28" />
+        </Style>
+
+        <Style Selector="Button">
+            <Setter Property="Background" Value="{DynamicResource ButtonBgBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource ButtonFgBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="12,6" />
+        </Style>
+        <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ButtonHoverBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource ButtonFgBrush}" />
+        </Style>
+        <Style Selector="Button:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ButtonPressedBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource ButtonFgBrush}" />
+        </Style>
+
+        <Style Selector="TextBlock.online">
+            <Setter Property="Foreground" Value="{DynamicResource OnlineBrush}" />
+        </Style>
+        <Style Selector="TextBlock.offline">
+            <Setter Property="Foreground" Value="{DynamicResource OfflineBrush}" />
+        </Style>
+    </Application.Styles>
+</Application>
