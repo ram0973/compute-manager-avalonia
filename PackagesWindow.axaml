@@ -1,0 +1,61 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ComputerManager.PackagesWindow"
+        Title="Установка программ" Width="1150" Height="600" MinWidth="800" MinHeight="420"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontSize="13">
+
+    <DockPanel Margin="16">
+        <TextBlock x:Name="InfoText" DockPanel.Dock="Bottom" Opacity="0.85" TextWrapping="Wrap" Margin="0,10,0,0" />
+
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="📦 Установить выбранный пакет на выбранные ПК" FontWeight="SemiBold" Click="OnInstallClick" />
+            <Button Content="Закрыть" Click="OnCloseClick" IsCancel="True" />
+        </StackPanel>
+
+        <!-- Справа: выбор ПК -->
+        <DockPanel DockPanel.Dock="Right" Width="330" Margin="16,0,0,0">
+            <TextBlock DockPanel.Dock="Top" Text="Компьютеры (Ctrl/Shift — несколько)" FontWeight="SemiBold" Margin="0,0,0,6" />
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                <Button Content="Все онлайн" Click="OnSelectOnlineClick" />
+                <Button Content="Снять выбор" Click="OnClearSelectionClick" />
+            </StackPanel>
+            <ListBox x:Name="PcList" ItemsSource="{Binding Computers}" SelectionMode="Multiple,Toggle">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="{Binding Name}" MinWidth="140" />
+                            <TextBlock Text="{Binding Status}" Classes.online="{Binding IsOnline}" Classes.offline="{Binding IsOffline}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
+
+        <!-- Слева: каталог пакетов -->
+        <DockPanel>
+            <TextBlock DockPanel.Dock="Top" Text="Пакеты (каталог Install\packages.json; ячейки редактируются)" FontWeight="SemiBold" Margin="0,0,0,6" />
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                <Button Content="➕ Добавить файл…" Click="OnAddClick" />
+                <Button Content="🗑 Удалить" Click="OnRemoveClick" />
+                <Button Content="🔑 Пересчитать хэш" Click="OnRehashClick" />
+                <Button Content="✔ Проверить хэши" Click="OnVerifyClick" />
+                <Button Content="💾 Сохранить" Click="OnSaveClick" />
+            </StackPanel>
+
+            <DataGrid x:Name="PackagesGrid" AutoGenerateColumns="False" SelectionMode="Single"
+                      CanUserSortColumns="True" CanUserResizeColumns="True"
+                      GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{DynamicResource LineBrush}" RowHeight="28">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Название" Binding="{Binding Name, Mode=TwoWay}" Width="Auto" MinWidth="110" />
+                    <DataGridTextColumn Header="Файл (в Install)" Binding="{Binding Installer, Mode=TwoWay}" Width="Auto" MinWidth="150" />
+                    <DataGridTextColumn Header="Аргументы" Binding="{Binding Arguments, Mode=TwoWay}" Width="Auto" MinWidth="90" />
+                    <DataGridTextColumn Header="Удалить старые (маска имени)" Binding="{Binding UninstallPattern, Mode=TwoWay}" Width="Auto" MinWidth="120" />
+                    <DataGridTextColumn Header="Закрыть процессы" Binding="{Binding KillProcesses, Mode=TwoWay}" Width="Auto" MinWidth="110" />
+                    <DataGridTextColumn Header="SHA-256" Binding="{Binding HashShort}" IsReadOnly="True" Width="Auto"
+                                        FontFamily="{StaticResource MonoFont}" />
+                    <DataGridTextColumn Header="Хэш" Binding="{Binding HashStatus}" IsReadOnly="True" Width="Auto" MinWidth="110" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </DockPanel>
+    </DockPanel>
+</Window>
