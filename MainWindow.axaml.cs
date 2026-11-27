@@ -8,6 +8,7 @@ using Avalonia.VisualTree;
 using ComputerManager.Models;
 using ComputerManager.Services;
 using ComputerManager.ViewModels;
+using Avalonia.Input.Platform;
 
 namespace ComputerManager;
 
