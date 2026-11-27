@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="ComputerManager.MainWindow"
-        Title="Компьютеры AD" Width="1250" Height="650" FontSize="13">
+        Title="Компьютеры AD" Icon="/Assets/app.ico" Width="1350" Height="700" FontSize="13">
 
     <Window.KeyBindings>
         <KeyBinding Gesture="F5" Command="{Binding RefreshCommand}" />
@@ -11,74 +11,182 @@
         <Border DockPanel.Dock="Top" Padding="8" BorderThickness="0,0,0,1"
                 BorderBrush="{DynamicResource LineBrush}" Background="{DynamicResource PanelBrush}">
             <DockPanel>
-                <Button DockPanel.Dock="Right" Content="🌓 Тема" Click="OnThemeClick" Margin="8,0,0,0" />
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" Margin="8,0,0,0">
+                    <Button Content="?" FontWeight="Bold" Width="34" CornerRadius="17" Padding="0,6"
+                            HorizontalContentAlignment="Center" ToolTip.Tip="Справка (F1)" Click="OnHelpClick" />
+                    <Button Content="🌓 Тема" Click="OnThemeClick" />
+                </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Content="⟳ Обновить (F5)" Command="{Binding RefreshCommand}" />
                     <TextBox Width="190" PlaceholderText="Сервер AD / домен" Text="{Binding Server}" />
                     <TextBox Width="170" PlaceholderText="Пользователь (UPN)" Text="{Binding UserName}" />
                     <TextBox Width="120" PlaceholderText="Пароль" PasswordChar="●" Text="{Binding Password}" />
                     <CheckBox Content="LDAPS" IsChecked="{Binding UseSsl}" />
-                    <TextBox Width="220" PlaceholderText="🔍 Поиск…" Text="{Binding SearchText}" />
                 </StackPanel>
             </DockPanel>
         </Border>
 
-        <Border DockPanel.Dock="Bottom" Padding="8,4" BorderThickness="0,1,0,0"
+        <!-- Журнал: небольшая панель с прокруткой, последняя строка всегда видна -->
+        <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0"
                 BorderBrush="{DynamicResource LineBrush}" Background="{DynamicResource StatusBrush}">
-            <StackPanel Orientation="Horizontal" Spacing="10">
-                <ProgressBar Width="100" IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
-                <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontFamily="{StaticResource MonoFont}" />
-            </StackPanel>
+            <DockPanel>
+                <ProgressBar DockPanel.Dock="Top" Height="3" Background="Transparent" IsIndeterminate="{Binding IsBusy}" />
+                <ListBox x:Name="LogList" Height="110" ItemsSource="{Binding LogLines}"
+                         Background="Transparent" Padding="4,2" FontSize="12"
+                         FontFamily="{StaticResource MonoFont}">
+                    <ListBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Копировать весь журнал" Click="OnCopyLogClick" />
+                            <MenuItem Header="Очистить журнал" Click="OnClearLogClick" />
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
+                    <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                            <Setter Property="MinHeight" Value="18" />
+                            <Setter Property="Padding" Value="4,0" />
+                        </Style>
+                    </ListBox.Styles>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Text}" TextWrapping="NoWrap" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
         </Border>
 
-        <DataGrid x:Name="ComputersGrid"
-                  ItemsSource="{Binding Computers}"
-                  SelectedItem="{Binding SelectedComputer}"
-                  AutoGenerateColumns="False"
-                  SelectionMode="Extended"
-                  IsReadOnly="False"
-                  CanUserSortColumns="True"
-                  CanUserResizeColumns="True"
-                  GridLinesVisibility="Horizontal"
-                  HorizontalGridLinesBrush="{DynamicResource LineBrush}"
-                  RowHeight="28">
+        <TabControl x:Name="MainTabs" Margin="8,0,8,8">
 
-            <DataGrid.ContextMenu>
-                <ContextMenu x:Name="RowMenu">
-                    <MenuItem Header="🖥 Подключиться по RDP" Click="OnRdpClick" FontWeight="Bold" />
-                    <MenuItem Header="👁 Shadow RDP…" Click="OnShadowClick" />
-                    <MenuItem Header="🛠 Dameware (DWRCC)" Click="OnDwrccClick" />
-                    <MenuItem Header="👥 Сеансы (qwinsta)" PointerEntered="OnSessionsPointerEntered">
-                        <MenuItem Header="Наведите курсор, чтобы загрузить…" IsEnabled="False" />
-                    </MenuItem>
-                    <Separator />
-                    <MenuItem Header="⏻ Разбудить (Wake-on-LAN)" Click="OnWakeClick" />
-                    <MenuItem Header="Проверить доступность" Click="OnPingClick" />
-                    <Separator />
-                    <MenuItem Header="🗜 Обновить 7-Zip (удалить старые → поставить новый)" Click="OnUpdate7ZipClick" />
-                </ContextMenu>
-            </DataGrid.ContextMenu>
+            <!-- ===================== Компьютеры ===================== -->
+            <TabItem Header="🖥 Компьютеры">
+                <DockPanel>
+                    <TextBox DockPanel.Dock="Top" Width="340" HorizontalAlignment="Left" Margin="0,8,0,6"
+                             PlaceholderText="🔍 Поиск: имя, IP, ОС, описание, пользователь…"
+                             Text="{Binding SearchText}" />
 
-            <!-- Width="Auto": ширина по содержимому (растёт по мере появления данных) -->
-            <DataGrid.Columns>
-                <DataGridTemplateColumn Header="Статус" Width="Auto" MinWidth="150" SortMemberPath="Status" IsReadOnly="True">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Margin="12,0"
-                                       Classes.online="{Binding IsOnline}"
-                                       Classes.offline="{Binding IsOffline}" />
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-                <DataGridTextColumn Header="Описание" Binding="{Binding Description}" IsReadOnly="True" Width="Auto" MaxWidth="400" />
-                <DataGridTextColumn Header="Посл. вход" Binding="{Binding LastLogon, StringFormat=dd.MM.yyyy HH:mm}" IsReadOnly="True" Width="Auto" />
-                <DataGridTextColumn Header="ОС" Binding="{Binding OperatingSystem}" IsReadOnly="True" Width="Auto" />
-                <DataGridTextColumn Header="Имя" Binding="{Binding Name}" IsReadOnly="True" Width="Auto" MinWidth="100" />
-                <DataGridTextColumn Header="IP" Binding="{Binding IpAddress}" SortMemberPath="IpSort" IsReadOnly="True"
-                                    Width="Auto" MinWidth="120" FontFamily="{StaticResource MonoFont}" />
-                <DataGridTextColumn Header="MAC" Binding="{Binding MacAddress, Mode=TwoWay}" Width="Auto" MinWidth="150"
-                                    FontFamily="{StaticResource MonoFont}" />
-            </DataGrid.Columns>
-        </DataGrid>
+                    <DataGrid x:Name="ComputersGrid"
+                              ItemsSource="{Binding Computers}"
+                              SelectedItem="{Binding SelectedComputer}"
+                              AutoGenerateColumns="False"
+                              SelectionMode="Extended"
+                              IsReadOnly="False"
+                              CanUserSortColumns="True"
+                              CanUserResizeColumns="True"
+                              GridLinesVisibility="Horizontal"
+                              HorizontalGridLinesBrush="{DynamicResource LineBrush}"
+                              RowHeight="28">
+
+                        <DataGrid.ContextMenu>
+                            <ContextMenu x:Name="RowMenu">
+                                <MenuItem Header="🖥 Подключиться по RDP" Click="OnRdpClick" FontWeight="Bold" />
+                                <MenuItem Header="👁 Shadow RDP…" Click="OnShadowClick" />
+                                <MenuItem Header="🛠 Dameware (DWRCC)" Click="OnDwrccClick" />
+                                <MenuItem Header="💻 Удалённая консоль (PsExec)">
+                                    <MenuItem Header="cmd" Tag="cmd" Click="OnConsoleClick" />
+                                    <MenuItem Header="PowerShell 5" Tag="ps5" Click="OnConsoleClick" />
+                                    <MenuItem Header="PowerShell 7 (pwsh)" Tag="ps7" Click="OnConsoleClick" />
+                                    <Separator />
+                                    <MenuItem Header="cmd — от SYSTEM" Tag="cmd-s" Click="OnConsoleClick" />
+                                    <MenuItem Header="PowerShell 5 — от SYSTEM" Tag="ps5-s" Click="OnConsoleClick" />
+                                    <MenuItem Header="PowerShell 7 — от SYSTEM" Tag="ps7-s" Click="OnConsoleClick" />
+                                </MenuItem>
+                                <MenuItem Header="👥 Сеансы (qwinsta)" PointerEntered="OnSessionsPointerEntered">
+                                    <MenuItem Header="Наведите курсор, чтобы загрузить…" IsEnabled="False" />
+                                </MenuItem>
+                                <Separator />
+                                <MenuItem Header="🧰 Управление компьютером (mmc)" Tag="compmgmt.msc" Click="OnManagementClick" />
+                                <MenuItem Header="📂 Открыть диск C$ в проводнике" Tag="explorer-c$" Click="OnManagementClick" />
+                                <MenuItem Header="🔃 Обновление данных">
+                                    <MenuItem Header="👤 Кто вошёл" Click="OnWhoClick" />
+                                    <MenuItem Header="💾 Свободно на диске C:" Click="OnDiskClick" />
+                                    <MenuItem Header="🛡 Касперский" Click="OnKasperskyClick" />
+                                </MenuItem>
+                                <Separator />
+                                <MenuItem Header="🔄 gpupdate /force (PsExec)" Click="OnGpUpdateClick" />
+                                <MenuItem Header="📦 Установка программ…" Click="OnPackagesClick" />
+                                <Separator />
+                                <MenuItem Header="⏻ Разбудить (Wake-on-LAN)" Click="OnWakeClick" />
+                                <MenuItem Header="Проверить доступность" Click="OnPingClick" />
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+
+                        <!-- Width="Auto": ширина по содержимому (растёт по мере появления данных) -->
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="Статус" Width="Auto" MinWidth="150" SortMemberPath="Status" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Margin="12,0"
+                                                   Classes.online="{Binding IsOnline}"
+                                                   Classes.offline="{Binding IsOffline}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Описание" Binding="{Binding Description}" IsReadOnly="True" Width="Auto" MaxWidth="400" />
+                            <DataGridTextColumn Header="Вошли" Binding="{Binding LoggedOn}" IsReadOnly="True" Width="Auto" MinWidth="110" MaxWidth="400" />
+                            <DataGridTextColumn Header="Посл. вход" Binding="{Binding LastLogon, StringFormat=dd.MM.yyyy HH:mm}" IsReadOnly="True" Width="Auto" />
+                            <DataGridTextColumn Header="Имя" Binding="{Binding Name}" IsReadOnly="True" Width="Auto" MinWidth="100" />
+                            <DataGridTextColumn Header="IP" Binding="{Binding IpAddress}" SortMemberPath="IpSort" IsReadOnly="True"
+                                                Width="Auto" MinWidth="120" FontFamily="{StaticResource MonoFont}" />
+                            <DataGridTextColumn Header="MAC" Binding="{Binding MacAddress, Mode=TwoWay}" Width="Auto" MinWidth="150"
+                                                FontFamily="{StaticResource MonoFont}" />
+                            <DataGridTextColumn Header="ОС" Binding="{Binding OperatingSystem}" IsReadOnly="True" Width="Auto" />
+                            <DataGridTemplateColumn Header="Диск C:" Width="Auto" MinWidth="170" SortMemberPath="DiskFreeBytes" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DiskC}" VerticalAlignment="Center" Margin="12,0"
+                                                   Classes.bad="{Binding DiskLow}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="Касперский" Width="Auto" MinWidth="170" SortMemberPath="Kaspersky" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Kaspersky}" VerticalAlignment="Center" Margin="12,0"
+                                                   Classes.bad="{Binding KasperskyBad}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+
+            <!-- ===================== Пользователи ===================== -->
+            <TabItem Header="👤 Пользователи">
+                <DockPanel>
+                    <TextBox DockPanel.Dock="Top" Width="340" HorizontalAlignment="Left" Margin="0,8,0,6"
+                             PlaceholderText="🔍 Поиск: логин, ФИО, телефон…"
+                             Text="{Binding UserSearchText}" />
+
+                    <DataGrid x:Name="UsersGrid"
+                              ItemsSource="{Binding Users}"
+                              SelectedItem="{Binding SelectedUser}"
+                              AutoGenerateColumns="False"
+                              SelectionMode="Single"
+                              IsReadOnly="True"
+                              CanUserSortColumns="True"
+                              CanUserResizeColumns="True"
+                              GridLinesVisibility="Horizontal"
+                              HorizontalGridLinesBrush="{DynamicResource LineBrush}"
+                              RowHeight="28">
+
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="🔎 Найти ПК, где пользователь залогинен" Click="OnFindUserClick" FontWeight="Bold" />
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Логин" Binding="{Binding Login}" Width="Auto" MinWidth="120"
+                                                FontFamily="{StaticResource MonoFont}" />
+                            <DataGridTextColumn Header="ФИО" Binding="{Binding FullName}" Width="Auto" MinWidth="200" />
+                            <DataGridTextColumn Header="Телефон" Binding="{Binding Phone}" Width="Auto" MinWidth="110" />
+                            <DataGridTextColumn Header="Мобильный" Binding="{Binding Mobile}" Width="Auto" MinWidth="110" />
+                            <DataGridTextColumn Header="Где залогинен" Binding="{Binding Computers}" Width="Auto" MinWidth="140" MaxWidth="500" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+        </TabControl>
     </DockPanel>
 </Window>

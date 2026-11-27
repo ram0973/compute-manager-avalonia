@@ -27,11 +27,12 @@ public static class WindowsTitleBar
         // RGB заголовка / текста (в тон палитре приложения)
         int caption = ToColorRef(dark ? 0x143C60 : 0xE6D6A3);
         int text = ToColorRef(dark ? 0xE4E9F2 : 0x1B1810);
+        int border = ToColorRef(dark ? 0x080B11 : 0xE6D6A3); // тонкая рамка окна — в цвет нижней панели
         int useDark = dark ? 1 : 0;
 
         DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useDark, sizeof(int));
         DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, ref caption, sizeof(int));
-        DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, ref caption, sizeof(int));
+        DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, ref border, sizeof(int));
         DwmSetWindowAttribute(hwnd, DWMWA_TEXT_COLOR, ref text, sizeof(int));
     }
 

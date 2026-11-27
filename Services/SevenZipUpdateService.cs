@@ -1,5 +1,4 @@
-using System.Diagnostics;
-using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace ComputerManager.Services;
@@ -7,29 +6,20 @@ namespace ComputerManager.Services;
 public record UpdateResult(string Computer, bool Success, string Message);
 
 /// <summary>
-/// Удалённая замена 7-Zip через PsExec: копирует MSI и скрипт в \\ПК\ADMIN$\Temp
-/// и запускает скрипт от SYSTEM. Только Windows.
-/// Файлы ищутся рядом с программой: Install\7-zip\7-zip.msi и Install\PsExec64\PsExec64.exe
-/// (скрипт для удалённого ПК встроен в код — отдельный .ps1 не нужен).
+/// Удалённая замена 7-Zip через PsExec. Защита:
+///  1) PsExec64.exe и 7-zip.msi сверяются с SHA-256, вшитым в exe при сборке;
+///  2) скрипт вшит в код программы, на ПК копируется под случайным именем, и перед запуском его хэш проверяется;
+///  3) хэш MSI проверяется на удалённом ПК ещё раз — до удаления старой версии.
+/// Файлы: Install\7-zip\7-zip.msi, Install\PsExec64\PsExec64.exe. Только Windows.
 /// </summary>
 public class SevenZipUpdateService
 {
-    private static readonly string InstallDir = Path.Combine(AppContext.BaseDirectory, "Install");
-    private static readonly string MsiPath = Path.Combine(InstallDir, "7-zip", "7-zip.msi");
-    private static readonly string PsExecPath = Path.Combine(InstallDir, "PsExec64", "PsExec64.exe");
+    private static readonly string MsiPath = Path.Combine(AppPaths.InstallDir, "7-zip", "7-zip.msi");
 
-    public static readonly string LogDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ComputerManager", "logs");
-
-    static SevenZipUpdateService() => Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-
-    /// <summary>null — всё готово; иначе текст ошибки.</summary>
     public static string? Validate()
     {
-        if (!OperatingSystem.IsWindows()) return "Обновление 7-Zip через PsExec работает только в Windows.";
-        if (!File.Exists(PsExecPath)) return $"Не найден PsExec: {PsExecPath}";
-        if (!File.Exists(MsiPath)) return $"Не найден MSI: {MsiPath}";
-        return null;
+        if (PsExecService.Validate() is { } e1) return e1;
+        return InstallIntegrity.Verify(MsiPath, out _);
     }
 
     public async Task<UpdateResult> UpdateAsync(string host)
@@ -38,58 +28,42 @@ public class SevenZipUpdateService
         void Log(string s) { lock (log) log.AppendLine($"[{DateTime.Now:HH:mm:ss}] {s}"); }
 
         var tmp = $@"\\{host}\ADMIN$\Temp";
+        var guid = Guid.NewGuid().ToString("N");
+        var msiName = $"7zip-{guid}.msi";
+        var scriptName = $"7zip-{guid}.ps1";
         bool success = false;
         string message;
 
         try
         {
+            if (!PsExecService.IsSafeHost(host)) throw new ArgumentException($"Недопустимое имя хоста: {host}");
+            if (Validate() is { } error) throw new InvalidOperationException(error);
+            InstallIntegrity.Verify(MsiPath, out var msiHash);
+
+            var script = RemoteScript.Replace("__MSI_NAME__", msiName).Replace("__MSI_SHA256__", msiHash);
+            var scriptBytes = new UTF8Encoding(true).GetPreamble().Concat(Encoding.UTF8.GetBytes(script)).ToArray();
+            var scriptHash = Convert.ToHexString(SHA256.HashData(scriptBytes));
+
             Log("Копирование файлов на ПК…");
             await Task.Run(() =>
             {
-                File.Copy(MsiPath, Path.Combine(tmp, "7-zip.msi"), true);
-                File.WriteAllText(Path.Combine(tmp, "Remote-7Zip.ps1"), RemoteScript, new UTF8Encoding(true));
+                File.Copy(MsiPath, Path.Combine(tmp, msiName), true);
+                File.WriteAllBytes(Path.Combine(tmp, scriptName), scriptBytes);
             });
 
+            // сначала проверяем хэш скрипта, и только потом запускаем его
+            var bootstrap =
+                $"$f='C:\\Windows\\Temp\\{scriptName}'; " +
+                $"if ((Get-FileHash -Algorithm SHA256 -LiteralPath $f).Hash -ne '{scriptHash}') " +
+                "{ Write-Error 'Script hash mismatch'; exit 12 }; & $f; exit $LASTEXITCODE";
+
             Log("Запуск PsExec…");
-            var oem = Encoding.GetEncoding(CultureInfo.CurrentCulture.TextInfo.OEMCodePage);
-            var psi = new ProcessStartInfo(PsExecPath)
-            {
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                StandardOutputEncoding = oem,
-                StandardErrorEncoding = oem,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-            foreach (var a in new[]
-            {
-                $@"\\{host}", "-accepteula", "-nobanner", "-s",
-                "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
-                "-File", @"C:\Windows\Temp\Remote-7Zip.ps1",
-            }) psi.ArgumentList.Add(a);
+            var r = await PsExecService.RunAsync(host,
+                ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", bootstrap],
+                system: true, TimeSpan.FromMinutes(10), Log);
 
-            using var p = new Process { StartInfo = psi };
-            p.OutputDataReceived += (_, e) => { if (e.Data is not null) Log(e.Data); };
-            p.ErrorDataReceived += (_, e) => { if (e.Data is not null) Log(e.Data); };
-            p.Start();
-            p.StandardInput.Close();   // иначе powershell через PsExec может зависнуть, ожидая stdin
-            p.BeginOutputReadLine();
-            p.BeginErrorReadLine();
-
-            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
-            try
-            {
-                await p.WaitForExitAsync(cts.Token);
-                p.WaitForExit(); // дочитать буферы вывода
-                success = p.ExitCode == 0;
-                message = success ? "OK" : $"код {p.ExitCode}";
-            }
-            catch (OperationCanceledException)
-            {
-                try { p.Kill(true); } catch { }
-                message = "таймаут (10 мин)";
-            }
+            success = !r.TimedOut && r.ExitCode == 0;
+            message = r.TimedOut ? "таймаут (10 мин)" : success ? "OK" : $"код {r.ExitCode}";
         }
         catch (Exception ex)
         {
@@ -98,28 +72,37 @@ public class SevenZipUpdateService
         }
         finally
         {
-            try { File.Delete(Path.Combine(tmp, "7-zip.msi")); } catch { }
-            try { File.Delete(Path.Combine(tmp, "Remote-7Zip.ps1")); } catch { }
+            try { File.Delete(Path.Combine(tmp, msiName)); } catch { }
+            try { File.Delete(Path.Combine(tmp, scriptName)); } catch { }
         }
 
         Log($"Итог: {(success ? "успех" : "ошибка")} ({message})");
         try
         {
-            Directory.CreateDirectory(LogDir);
-            File.WriteAllText(Path.Combine(LogDir, $"7zip-{host}-{DateTime.Now:yyyyMMdd-HHmmss}.log"), log.ToString());
+            Directory.CreateDirectory(AppPaths.LogDir);
+            File.WriteAllText(Path.Combine(AppPaths.LogDir, $"7zip-{host}-{DateTime.Now:yyyyMMdd-HHmmss}.log"), log.ToString());
         }
         catch { }
 
         return new UpdateResult(host, success, message);
     }
 
-    /// <summary>Выполняется НА удалённом ПК от SYSTEM: закрыть 7-Zip, удалить все версии, поставить MSI.</summary>
+    /// <summary>Выполняется НА удалённом ПК от SYSTEM: проверить MSI, закрыть 7-Zip, удалить все версии, поставить MSI.</summary>
     private const string RemoteScript = """"
         $ErrorActionPreference = 'Continue'
-        $msi = 'C:\Windows\Temp\7-zip.msi'
+        $msi = 'C:\Windows\Temp\__MSI_NAME__'
+        $expected = '__MSI_SHA256__'
         $log = 'C:\Windows\Temp\7zip-install.log'
 
-        if (-not (Test-Path $msi)) { Write-Error "Нет файла $msi"; exit 10 }
+        if (-not (Test-Path -LiteralPath $msi)) { Write-Error "Нет файла $msi"; exit 10 }
+
+        $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $msi).Hash
+        if ($actual -ne $expected) {
+            Write-Error "Хэш MSI не совпадает (ожидался $expected, получен $actual)"
+            Remove-Item -LiteralPath $msi -Force -ErrorAction SilentlyContinue
+            exit 11
+        }
+        Write-Host "Хэш MSI совпал: $actual"
 
         Get-Process 7zFM, 7zG -ErrorAction SilentlyContinue | Stop-Process -Force
 
@@ -154,6 +137,7 @@ public class SevenZipUpdateService
                  Where-Object { Test-Path $_ } | Select-Object -First 1
         if ($exe7z) { Write-Host "Установлена версия: $((Get-Item $exe7z).VersionInfo.ProductVersion)" }
 
+        Remove-Item -LiteralPath $msi -Force -ErrorAction SilentlyContinue
         if ($p.ExitCode -in 0, 3010) { exit 0 } else { exit $p.ExitCode }
         """";
 }

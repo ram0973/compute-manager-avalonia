@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Styling;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using ComputerManager.Models;
 using ComputerManager.Services;
@@ -23,8 +24,17 @@ public partial class MainWindow : Window
         var vm = new MainViewModel();
         DataContext = vm;
 
-        // ПКМ выделяет строку под курсором, чтобы меню работало с нужным ПК
+        // ПКМ выделяет строку под курсором, чтобы меню работало с нужным элементом
         ComputersGrid.AddHandler(PointerPressedEvent, OnGridPointerPressed, RoutingStrategies.Tunnel);
+        UsersGrid.AddHandler(PointerPressedEvent, OnGridPointerPressed, RoutingStrategies.Tunnel);
+
+        KeyDown += (_, e) => { if (e.Key == Key.F1) ShowHelp(); };
+
+        // журнал: после каждой записи показываем последнюю строку, а ранние доступны прокруткой
+        vm.LogLines.CollectionChanged += (_, _) => Dispatcher.UIThread.Post(() =>
+        {
+            if (vm.LogLines.Count > 0) LogList.ScrollIntoView(vm.LogLines[^1]);
+        }, DispatcherPriority.Background);
 
         // нативный заголовок Windows 11 в цветах темы (перекрашивается при смене темы)
         Opened += (_, _) => WindowsTitleBar.Apply(this);
@@ -35,7 +45,20 @@ public partial class MainWindow : Window
 
     private MainViewModel Vm => (MainViewModel)DataContext!;
 
-    // ---------- тема ----------
+    private List<ComputerInfo> SelectedComputers() => ComputersGrid.SelectedItems.OfType<ComputerInfo>().ToList();
+
+    // ---------- журнал ----------
+
+    private async void OnCopyLogClick(object? sender, RoutedEventArgs e)
+    {
+        var text = string.Join(Environment.NewLine, Vm.LogLines.Select(l => l.Text));
+        if (GetTopLevel(this)?.Clipboard is { } clipboard)
+            await clipboard.SetTextAsync(text);
+    }
+
+    private void OnClearLogClick(object? sender, RoutedEventArgs e) => Vm.ClearLog();
+
+    // ---------- тема и справка ----------
 
     private void OnThemeClick(object? sender, RoutedEventArgs e)
     {
@@ -45,18 +68,67 @@ public partial class MainWindow : Window
         ThemeSettings.Save(next);
     }
 
-    // ---------- контекстное меню ----------
+    private void OnHelpClick(object? sender, RoutedEventArgs e) => ShowHelp();
+
+    private async void ShowHelp() => await new HelpWindow().ShowDialog(this);
+
+    // ---------- контекстное меню компьютеров ----------
 
     private void OnRdpClick(object? sender, RoutedEventArgs e) => Vm.ConnectRdpCommand.Execute(null);
     private void OnWakeClick(object? sender, RoutedEventArgs e) => Vm.WakeCommand.Execute(null);
     private void OnPingClick(object? sender, RoutedEventArgs e) => Vm.PingSelectedCommand.Execute(null);
     private void OnDwrccClick(object? sender, RoutedEventArgs e) => Vm.ConnectDwrccCommand.Execute(null);
 
+    private void OnManagementClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem { Tag: string tool } && Vm.SelectedComputer is { } c)
+            Vm.OpenManagement(tool, c);
+    }
+
+    private void OnConsoleClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: string tag } || Vm.SelectedComputer is not { } c) return;
+
+        bool system = tag.EndsWith("-s", StringComparison.Ordinal);
+        Vm.OpenConsole(system ? tag[..^2] : tag, system, c);
+    }
+
+    private async void OnDiskClick(object? sender, RoutedEventArgs e) =>
+        await Vm.CheckDiskAsync(SelectedComputers());
+
+    private async void OnWhoClick(object? sender, RoutedEventArgs e) =>
+        await Vm.ScanLoggedOnAsync(SelectedComputers());
+
+    private async void OnKasperskyClick(object? sender, RoutedEventArgs e) =>
+        await Vm.CheckKasperskyAsync(SelectedComputers(), manual: true);
+
     private async void OnShadowClick(object? sender, RoutedEventArgs e)
     {
         if (Vm.SelectedComputer is not { } c) return;
         await new ShadowDialog(c.Name, c.Host).ShowDialog(this);
     }
+
+    private async void OnGpUpdateClick(object? sender, RoutedEventArgs e)
+    {
+        var targets = SelectedComputers();
+        if (targets.Count == 0) return;
+
+        if (Vm.CheckGpUpdateFiles() is { } error)
+        {
+            Vm.StatusText = error;
+            return;
+        }
+
+        if (targets.Count > 1 &&
+            !await Dialogs.ConfirmAsync(this, "gpupdate /force", $"Выполнить gpupdate /force на {targets.Count} ПК?"))
+            return;
+
+        await Vm.GpUpdateAsync(targets);
+    }
+
+    /// <summary>Окно «Установка программ»: каталог пакетов + выбор ПК (выделенные в таблице подставляются заранее).</summary>
+    private void OnPackagesClick(object? sender, RoutedEventArgs e) =>
+        new PackagesWindow(Vm, SelectedComputers()).Show(this);
 
     /// <summary>Подменю «Сеансы»: при наведении запрашивает qwinsta; клик по сеансу = shadow-подключение.</summary>
     private async void OnSessionsPointerEntered(object? sender, RoutedEventArgs e)
@@ -111,34 +183,34 @@ public partial class MainWindow : Window
         foreach (var i in items) menu.Items.Add(i);
     }
 
-    private async void OnUpdate7ZipClick(object? sender, RoutedEventArgs e)
+    // ---------- вкладка «Пользователи» ----------
+
+    /// <summary>Ищет ПК, где залогинен пользователь, переключает на вкладку «Компьютеры» и выделяет найденные ПК.</summary>
+    private async void OnFindUserClick(object? sender, RoutedEventArgs e)
     {
-        var targets = ComputersGrid.SelectedItems.OfType<ComputerInfo>().ToList();
-        if (targets.Count == 0) return;
+        if (UsersGrid.SelectedItem is not UserInfo u) return;
 
-        if (Vm.Check7ZipFiles() is { } error)
-        {
-            Vm.StatusText = error;
-            return;
-        }
+        var found = await Vm.FindUserComputersAsync(u);
+        if (found.Count == 0) return; // причина — в строке состояния
 
-        var names = string.Join(", ", targets.Take(5).Select(t => t.Name)) +
-                    (targets.Count > 5 ? $" и ещё {targets.Count - 5}" : "");
+        Vm.SearchText = "";            // чтобы фильтр не скрыл найденные ПК
+        MainTabs.SelectedIndex = 0;
 
-        bool ok = await Dialogs.ConfirmAsync(this, "Обновить 7-Zip",
-            $"ПК: {targets.Count} ({names})\n\n" +
-            "Все установленные версии 7-Zip будут удалены, затем установится версия из Install\\7-zip\\7-zip.msi.");
-        if (!ok) return;
-
-        await Vm.Update7ZipAsync(targets);
+        ComputersGrid.SelectedItems.Clear();
+        foreach (var c in found) ComputersGrid.SelectedItems.Add(c);
+        ComputersGrid.ScrollIntoView(found[0], null);
+        ComputersGrid.Focus();
     }
+
+    // ---------- выделение строки правой кнопкой ----------
 
     private void OnGridPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (!e.GetCurrentPoint(ComputersGrid).Properties.IsRightButtonPressed) return;
+        if (sender is not DataGrid grid) return;
+        if (!e.GetCurrentPoint(grid).Properties.IsRightButtonPressed) return;
 
         var row = (e.Source as Visual)?.GetSelfAndVisualAncestors().OfType<DataGridRow>().FirstOrDefault();
-        if (row?.DataContext is ComputerInfo c && !ComputersGrid.SelectedItems.Contains(c))
-            ComputersGrid.SelectedItem = c; // не сбрасываем мультивыделение, если клик по выделенной строке
+        if (row?.DataContext is { } item && !grid.SelectedItems.Contains(item))
+            grid.SelectedItem = item; // не сбрасываем мультивыделение, если клик по выделенной строке
     }
 }

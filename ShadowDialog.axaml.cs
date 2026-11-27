@@ -9,6 +9,7 @@ namespace ComputerManager;
 public partial class ShadowDialog : Window
 {
     private readonly string _host = "";
+    private List<RdpSession> _loaded = [];
     public ObservableCollection<RdpSession> Sessions { get; } = [];
 
     /// <summary>Нужен загрузчику XAML (иначе предупреждение AVLN3001) и дизайнеру.</summary>
@@ -38,19 +39,27 @@ public partial class ShadowDialog : Window
         if (!r.Success)
         {
             StatusText.Text = "Ошибка: " + r.Error;
+            RefreshButton.IsEnabled = true;
+            return;
         }
+
+        _loaded = r.Sessions;
+        Fill();
+        RefreshButton.IsEnabled = true;
+    }
+
+    /// <summary>Показываем только сеансы с пользователем (на экране входа shadow невозможен).</summary>
+    private void Fill()
+    {
+        Sessions.Clear();
+        foreach (var s in _loaded.Where(s => s.HasUser)) Sessions.Add(s);
+
+        if (Sessions.Count == 0) StatusText.Text = "Нет сеансов пользователей.";
         else
         {
-            foreach (var s in r.Sessions.Where(s => s.HasUser)) Sessions.Add(s);
-
-            if (Sessions.Count == 0) StatusText.Text = "Нет сеансов пользователей.";
-            else
-            {
-                StatusText.Text = $"Сеансов: {Sessions.Count}";
-                SessionsGrid.SelectedItem = Sessions.FirstOrDefault(s => s.IsActive) ?? Sessions[0];
-            }
+            StatusText.Text = $"Сеансов: {Sessions.Count}";
+            SessionsGrid.SelectedItem = Sessions.FirstOrDefault(s => s.IsActive) ?? Sessions[0];
         }
-        RefreshButton.IsEnabled = true;
     }
 
     private async void OnRefreshClick(object? sender, RoutedEventArgs e) => await LoadAsync();

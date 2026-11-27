@@ -22,6 +22,16 @@ public partial class ComputerInfo : ObservableObject
     [ObservableProperty] public partial bool IsOffline { get; set; }
     [ObservableProperty] public partial string? MacAddress { get; set; }
 
+    /// <summary>Свободно на C: (текст для таблицы), байты для сортировки и признак «мало места».</summary>
+    [ObservableProperty] public partial string? DiskC { get; set; }
+    [ObservableProperty] public partial long DiskFreeBytes { get; set; } = -1;
+    [ObservableProperty] public partial bool DiskLow { get; set; }
+
+    /// <summary>Кто сейчас вошёл (логины из qwinsta) и состояние Касперского.</summary>
+    [ObservableProperty] public partial string? LoggedOn { get; set; }
+    [ObservableProperty] public partial string? Kaspersky { get; set; }
+    [ObservableProperty] public partial bool KasperskyBad { get; set; }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IpSort))]
     public partial string? IpAddress { get; set; }

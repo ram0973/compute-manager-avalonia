@@ -9,10 +9,16 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>ComputerManager</RootNamespace>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <!-- платформо-зависимые API (ServiceController, DwmSetWindowAttribute) вызываются только после проверки ОС -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\Fonts\**" />
+    <AvaloniaResource Include="Assets\app.ico" />
+    <!-- Скрипты вшиваются в exe и достаются оттуда во время работы; на диск рядом с программой не копируются -->
+    <EmbeddedResource Include="Scripts\*.ps1" LogicalName="Scripts.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,9 +29,10 @@
     <PackageReference Include="Avalonia.Fonts.Inter" Version="12.*" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.*" />
     <PackageReference Include="System.DirectoryServices.Protocols" Version="11.0.0" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="11.*" />
   </ItemGroup>
 
-  <!-- Папка Install (7-zip.msi, PsExec64.exe) копируется явно: и в bin, и в publish -->
+  <!-- Папка Install (установщики, PsExec64.exe, packages.json) копируется явно: и в bin, и в publish -->
   <Target Name="CopyInstallFolder" AfterTargets="Build" Condition="Exists('$(MSBuildProjectDirectory)\Install')">
     <ItemGroup>
       <InstallFilesBuild Include="$(MSBuildProjectDirectory)\Install\**\*" />
@@ -42,8 +49,6 @@
     <Copy SourceFiles="@(InstallFilesPublish)"
           DestinationFiles="@(InstallFilesPublish->'$(PublishDir)Install\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
-    <Warning Condition="!Exists('$(MSBuildProjectDirectory)\Install\7-zip\7-zip.msi')"
-             Text="Нет файла $(MSBuildProjectDirectory)\Install\7-zip\7-zip.msi - положите его туда, иначе он не попадёт в publish." />
     <Warning Condition="!Exists('$(MSBuildProjectDirectory)\Install\PsExec64\PsExec64.exe')"
              Text="Нет файла $(MSBuildProjectDirectory)\Install\PsExec64\PsExec64.exe - положите его туда, иначе он не попадёт в publish." />
     <Message Importance="high" Text="Install скопирована в $(PublishDir)Install" />

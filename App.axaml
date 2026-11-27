@@ -10,6 +10,7 @@
                 <ResourceDictionary x:Key="Light">
                     <SolidColorBrush x:Key="OnlineBrush">#1B5E20</SolidColorBrush>
                     <SolidColorBrush x:Key="OfflineBrush">#5C5439</SolidColorBrush>
+                    <SolidColorBrush x:Key="DiskLowBrush">#B3261E</SolidColorBrush>
                     <SolidColorBrush x:Key="PanelBrush">#EFE2B8</SolidColorBrush>
                     <SolidColorBrush x:Key="StatusBrush">#E6D6A3</SolidColorBrush>
                     <SolidColorBrush x:Key="LineBrush">#CDBB86</SolidColorBrush>
@@ -21,6 +22,7 @@
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="OnlineBrush">#66BB6A</SolidColorBrush>
                     <SolidColorBrush x:Key="OfflineBrush">#9AA5BA</SolidColorBrush>
+                    <SolidColorBrush x:Key="DiskLowBrush">#FF7B72</SolidColorBrush>
                     <SolidColorBrush x:Key="PanelBrush">#171C28</SolidColorBrush>
                     <SolidColorBrush x:Key="StatusBrush">#080B11</SolidColorBrush>
                     <SolidColorBrush x:Key="LineBrush">#22304D</SolidColorBrush>
@@ -98,6 +100,10 @@
 
         <Style Selector="TextBlock.online">
             <Setter Property="Foreground" Value="{DynamicResource OnlineBrush}" />
+        </Style>
+        <Style Selector="TextBlock.bad">
+            <Setter Property="Foreground" Value="{DynamicResource DiskLowBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
         <Style Selector="TextBlock.offline">
             <Setter Property="Foreground" Value="{DynamicResource OfflineBrush}" />
